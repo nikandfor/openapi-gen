@@ -1,0 +1,88 @@
+{{ define "schemaType" -}}
+{{ with .Value -}}
+	{{ if eq .Type "string" -}}string
+	{{- else if eq .Type "array" -}}
+		[]{{ template "schema" .Items }}
+	{{- else if eq .Type "object" -}}
+		{{ if eq 0 (len .Properties) -}}
+			map[string]interface{}
+		{{- else -}}
+			struct {
+			{{ range $fn, $v := .Properties -}}
+				{{ $fn | CamelCase }} {{ template "schema" . }} `json:"{{ $fn }},omitempty"`
+			{{ end -}}
+			}
+		{{- end -}}
+	{{ else }}
+		{{ dump . }}
+	{{- end -}}
+{{ end -}}
+{{ end -}}
+
+{{ define "schema" -}}
+{{ with .Ref -}}
+	*{{ basename . -}}
+{{ else -}}
+	{{ template "schemaType" . -}}
+{{ end -}}
+{{ end -}}
+
+{{ define "params" -}}
+{{ range $i, $e := . -}}
+	{{ if $i }}, {{ end -}}
+	{{ with .Value -}}
+		{{ .Name }} {{ template "schema" .Schema -}}
+	{{ end -}}
+{{ end -}}
+{{ end -}}
+
+{{ define "paramNames" -}}
+{{ range $i, $e := . -}}
+	{{ with .Value -}}
+		, {{ .Name -}}
+	{{ end -}}
+{{ end -}}
+{{ end -}}
+
+{{ define "typeRef" -}}
+{{ with .Ref -}}
+	{{ basename . | untitle }} *{{ basename . -}}
+{{ else -}}
+	{{ . }}
+{{ end -}}
+{{ end -}}
+
+{{ define "typeDef" -}}
+{{ with .Ref -}}
+	{{ basename . | untitle }} {{ basename . -}}
+{{ else -}}
+	{{ . }}
+{{ end -}}
+{{ end -}}
+
+{{ define "typeVar" -}}
+{{ with .Ref -}}
+	{{ basename . | untitle -}}
+{{ else -}}
+	{{ . }}
+{{ end -}}
+{{ end -}}
+
+{{ define "typeType" -}}
+{{ with .Ref -}}
+	{{ basename . | title -}}
+{{ else -}}
+	{{ . }}
+{{ end -}}
+{{ end -}}
+
+{{ define "funcsig" -}}
+		{{ .op.OperationID | title }}(ctx context.Context
+			{{- if or .params .op.RequestBody }}, {{ end }}
+			{{- template "params" .params }}
+			{{- if and .params .op.RequestBody }}, {{ end }}
+			{{- with .op.RequestBody }}{{ template "typeRef" . }}{{ end -}}
+		) (
+			{{- range .op.Responses }}{{ template "typeRef" . }}{{ end -}}
+			, err error){{ with .meth }} // {{ . }}{{ end -}}
+{{ end -}}
